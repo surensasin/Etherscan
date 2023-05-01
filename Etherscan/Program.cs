@@ -17,7 +17,11 @@ namespace Etherscan
 
         static HttpResponseMessage response = new HttpResponseMessage();
 
-        static Database DB = new Database();
+        static string connectionString = "Data Source=localhost;Initial Catalog=Etherscan;User ID=sa;Password=H@llow0rld;";
+        
+        static SqlConnection connection = new SqlConnection(connectionString);
+
+        static Database DB = new Database(connection);
 
         private static readonly ILogger Logger = LogManager.GetCurrentClassLogger();
 
@@ -94,10 +98,10 @@ namespace Etherscan
                             decimal gasLimit = fromHex.toDecimal(resultJson.result.gasLimit.ToString());
                             decimal gasUsed = fromHex.toDecimal(resultJson.result.gasUsed.ToString());
 
-                            string insertString = "INSERT INTO blocks (blockNumber, hash, parentHash, miner, blockReward, gasLimit, gasUsed) OUTPUT INSERTED.blockID VALUES (@param0, @param1, @param2, @param3, @param4, @param5, @param6)";
-                            object[] values = { blockNumber, hash, parentHash, miner, blockReward, gasLimit, gasUsed };
+                            string insertString = "INSERT INTO blocks (blockNumber, hash, parentHash, miner, blockReward, gasLimit, gasUsed) OUTPUT INSERTED.blockID VALUES ("+ blockNumber + ", \'" + hash + "\', \'" + parentHash + "\', \'" + miner + "\', " + blockReward + ", " + gasLimit + ", " + gasUsed + ")";
+                            //object[] values = { blockNumber, hash, parentHash, miner, blockReward, gasLimit, gasUsed };
 
-                            int blockID = DB.insertData(insertString, values);
+                            int blockID = DB.insertData(insertString);//, values);
                             
                             if (blockID != 0)
                             {
@@ -226,10 +230,10 @@ namespace Etherscan
 
                                 int transactionIndex = i;
 
-                                string insertString = "INSERT INTO transactions (blockID, hash, [from], [to], value, gas, gasPrice, transactionIndex) OUTPUT INSERTED.transactionID VALUES (@param0, @param1, @param2, @param3, @param4, @param5, @param6, @param7)";
-                                object[] values = { blockID, hash, from, to, value, gas, gasPrice, transactionIndex };
+                                string insertString = "INSERT INTO transactions (blockID, hash, [from], [to], value, gas, gasPrice, transactionIndex) OUTPUT INSERTED.transactionID VALUES ("+ blockID + ", \'" + hash + "\', \'" + from + "\', \'" + to + "\', " + value + ", " + gas + ", " + gasPrice + ", " + transactionIndex + ")";
+                                //object[] values = { blockID, hash, from, to, value, gas, gasPrice, transactionIndex };
 
-                                int transID = DB.insertData(insertString, values);
+                                int transID = DB.insertData(insertString);//, values);
 
                                 if (transID != 0)
                                 {
@@ -272,29 +276,31 @@ namespace Etherscan
 
         private class Database
         {
-            public int insertData(string insertString, params object[] values)
+            private SqlConnection _connection;
+
+            public Database(SqlConnection connection)
+            {
+                _connection = connection;
+            }
+            public int insertData(string insertString)//, params object[] values)
             {
                 int ID = 0;
                 try
                 {
-                    string connectionString = "Data Source=localhost;Initial Catalog=Etherscan;User ID=sa;Password=H@llow0rld";
-                    using (SqlConnection connection = new SqlConnection(connectionString))
-                    {
-                        connection.Open();
-                        using (SqlCommand command = new SqlCommand(insertString, connection))
+                    _connection.Open();
+                        using (SqlCommand command = new SqlCommand(insertString, _connection))
                         {
                             // Add parameters to the command object based on the values array
-                            for (int i = 0; i < values.Length; i++)
+                            /*for (int i = 0; i < values.Length; i++)
                             {
                                 command.Parameters.AddWithValue("@param" + i, values[i]);
-                            }
+                            }*/
 
                             // Open the connection, execute the query, and close the connection
 
                             ID = (int)command.ExecuteScalar();
-                            connection.Close();
+                            _connection.Close();
                         }
-                    }
                     return ID;
                 }
                 catch (Exception ex)
